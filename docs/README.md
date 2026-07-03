@@ -102,3 +102,61 @@ The system consists of three interconnected COBOL programs working together to p
 
 4. **Action Trailing Spaces**:
    * Parameters passed between the programs are fixed-length strings (`PIC X(6)`). Operations like `'TOTAL '` and `'DEBIT '` must include trailing spaces to match the 6-character expectation, whereas `'CREDIT'` fits perfectly.
+
+---
+
+## Data Flow & Sequence Diagram
+
+The following sequence diagram illustrates the user interaction and inter-program data flows for all three operations: **View Balance**, **Credit**, and **Debit** (detailing both success and insufficient funds error paths).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User
+    participant Main as main.cob<br/>(MainProgram)
+    participant Ops as operations.cob<br/>(Operations)
+    participant Data as data.cob<br/>(DataProgram)
+
+    rect rgb(240, 248, 255)
+        note over User, Data: Option 1: View Balance
+        User->>Main: Select option 1
+        Main->>Ops: CALL 'Operations' USING 'TOTAL '
+        Ops->>Data: CALL 'DataProgram' USING 'READ', FINAL-BALANCE
+        Data-->>Ops: Return STORAGE-BALANCE (in FINAL-BALANCE)
+        Ops-->>User: DISPLAY "Current balance: [FINAL-BALANCE]"
+    end
+
+    rect rgb(245, 255, 250)
+        note over User, Data: Option 2: Credit Account
+        User->>Main: Select option 2
+        Main->>Ops: CALL 'Operations' USING 'CREDIT'
+        Ops-->>User: DISPLAY "Enter credit amount: "
+        User->>Ops: Enter AMOUNT
+        Ops->>Data: CALL 'DataProgram' USING 'READ', FINAL-BALANCE
+        Data-->>Ops: Return STORAGE-BALANCE
+        Note over Ops: ADD AMOUNT TO FINAL-BALANCE
+        Ops->>Data: CALL 'DataProgram' USING 'WRITE', FINAL-BALANCE
+        Data-->>Ops: Update STORAGE-BALANCE
+        Ops-->>User: DISPLAY "Amount credited. New balance: [FINAL-BALANCE]"
+    end
+
+    rect rgb(255, 240, 245)
+        note over User, Data: Option 3: Debit Account
+        User->>Main: Select option 3
+        Main->>Ops: CALL 'Operations' USING 'DEBIT '
+        Ops-->>User: DISPLAY "Enter debit amount: "
+        User->>Ops: Enter AMOUNT
+        Ops->>Data: CALL 'DataProgram' USING 'READ', FINAL-BALANCE
+        Data-->>Ops: Return STORAGE-BALANCE
+
+        alt FINAL-BALANCE >= AMOUNT (Sufficient Funds)
+            Note over Ops: SUBTRACT AMOUNT FROM FINAL-BALANCE
+            Ops->>Data: CALL 'DataProgram' USING 'WRITE', FINAL-BALANCE
+            Data-->>Ops: Update STORAGE-BALANCE
+            Ops-->>User: DISPLAY "Amount debited. New balance: [FINAL-BALANCE]"
+        else FINAL-BALANCE < AMOUNT (Insufficient Funds)
+            Ops-->>User: DISPLAY "Insufficient funds for this debit."
+        end
+    end
+```
+
